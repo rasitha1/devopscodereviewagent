@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>CodeReviewAgent</RootNamespace>
+    <AssemblyName>CodeReviewAgent</AssemblyName>
+
+    <!-- Global tool packaging -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>ai-code-review</ToolCommandName>
+
+    <!-- NuGet package identity -->
+    <PackageId>rasitha.DevOpsCodeReviewAgent</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>rasitha1</Authors>
+    <Copyright>Copyright © 2026 rasitha1</Copyright>
+
+    <!-- NuGet.org display -->
+    <Title>AI Code Review</Title>
+    <Description>AI-powered .NET code review agent for Azure Pipelines. Uses Azure OpenAI with Entra authentication to autonomously review pull requests and post inline findings as Azure DevOps PR comments.</Description>
+    <PackageTags>dotnet;code-review;azure-openai;azure-devops;ai;semantic-kernel;devops;pull-request</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageProjectUrl>https://github.com/rasitha1/CodeReviewAgent</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/rasitha1/CodeReviewAgent</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+
+    <!-- Embeds source info in the package for debugging -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+
+    <!-- Suppress Semantic Kernel experimental API warnings -->
+    <NoWarn>$(NoWarn);SKEXP0001;SKEXP0010;SKEXP0020;SKEXP0110</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Bundle the README so NuGet.org renders it on the package page -->
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Spectre.Console.Cli" Version="0.49.1" />
+    <PackageReference Include="Microsoft.SemanticKernel" Version="1.76.0" />
+    <PackageReference Include="Azure.Identity" Version="1.13.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.0" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,82 @@
+# AI Code Review — PR validation pipeline
+#
+# Prerequisites
+# =============
+# 1. Publish the tool to a NuGet feed (internal or nuget.org):
+#      dotnet pack src/CodeReviewAgent/CodeReviewAgent.csproj -c Release -o ./nupkg
+#      dotnet nuget push ./nupkg/rasitha.DevOpsCodeReviewAgent.1.0.0.nupkg --source <your-feed>
+#
+# 2. Create an Azure service connection (service principal) that has:
+#      - Azure OpenAI: "Cognitive Services OpenAI User" role on the OpenAI resource
+#      - Azure DevOps: added to the project as a member with "Contribute to pull requests"
+#        permission on this repository (Project Settings → Repos → Security)
+#
+# 3. Add pipeline variables (or variable group):
+#      AZURE_OPENAI_ENDPOINT   e.g. https://my-resource.openai.azure.com/
+#      AZURE_OPENAI_DEPLOYMENT e.g. gpt-4o
+#
+# How authentication works
+# ========================
+# The AzureCLI@2 task logs in with the service connection before running the script.
+# - For Azure OpenAI:  DefaultAzureCredential picks up the AZ CLI login automatically.
+# - For ADO comments:  AzureCliCredential (Azure.Identity) gets a token for resource
+#                      499b84ac-1321-427f-aa17-267ca6975798 (Azure DevOps) using the
+#                      same logged-in identity. No PAT or System.AccessToken needed.
+#
+# The PR context (org, project, repo, PR ID, base branch) is read automatically
+# from the Azure Pipelines environment variables that the platform sets on PR builds.
+
+trigger: none   # Only run on PRs, not on direct pushes
+
+pr:
+  branches:
+    include:
+      - main
+      - develop
+      - release/*
+
+pool:
+  vmImage: ubuntu-latest   # Or windows-latest — the tool is cross-platform
+
+steps:
+
+  - task: UseDotNet@2
+    displayName: Use .NET 9
+    inputs:
+      packageType: sdk
+      version: 9.0.x
+
+  # Install from nuget.org (or replace --source with your internal feed URL)
+  - task: DotNetCoreCLI@2
+    displayName: Install ai-code-review
+    inputs:
+      command: custom
+      custom: tool
+      arguments: install --global rasitha.DevOpsCodeReviewAgent --version 1.0.0
+    # To install from an internal feed, add:
+    #   arguments: install --global rasitha.DevOpsCodeReviewAgent --version 1.0.0 --add-source https://pkgs.dev.azure.com/<org>/<project>/_packaging/<feed>/nuget/v3/index.json
+
+  - task: AzureCLI@2
+    displayName: Run AI Code Review
+    inputs:
+      azureSubscription: your-service-connection-name   # <-- update this
+      scriptType: bash
+      scriptLocation: inlineScript
+      addSpnToEnvironment: true   # exposes servicePrincipalId etc. if needed for debugging
+      inlineScript: |
+        ai-code-review \
+          --endpoint   "$(AZURE_OPENAI_ENDPOINT)" \
+          --deployment "$(AZURE_OPENAI_DEPLOYMENT)" \
+          --devops-comment \
+          --fail-on high
+        # Remove --devops-comment to run in console-only mode (e.g. local dev)
+        # Remove --fail-on (or set to none) to make this step advisory-only
+    env:
+      AZURE_OPENAI_ENDPOINT:    $(AZURE_OPENAI_ENDPOINT)
+      AZURE_OPENAI_DEPLOYMENT:  $(AZURE_OPENAI_DEPLOYMENT)
+      # The following are set automatically by Azure Pipelines on PR builds:
+      # SYSTEM_PULLREQUEST_TARGETBRANCH       → base branch (auto-detected)
+      # SYSTEM_PULLREQUEST_PULLREQUESTID      → PR ID (auto-detected)
+      # SYSTEM_TEAMPROJECT                    → project name (auto-detected)
+      # SYSTEM_TEAMFOUNDATIONCOLLECTIONURI    → org URL (auto-detected)
+      # BUILD_REPOSITORY_NAME                 → repo name (auto-detected)
