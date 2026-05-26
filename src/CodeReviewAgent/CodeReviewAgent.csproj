@@ -21,7 +21,7 @@
     <!-- NuGet.org display -->
     <Title>AI Code Review</Title>
     <Description>AI-powered .NET code review agent for Azure Pipelines. Uses Azure OpenAI with Entra authentication to autonomously review pull requests and post inline findings as Azure DevOps PR comments.</Description>
-    <PackageTags>dotnet;code-review;azure-openai;azure-devops;ai;semantic-kernel;devops;pull-request</PackageTags>
+    <PackageTags>dotnet;code-review;azure-openai;azure-devops;ai;agent-framework;devops;pull-request</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageProjectUrl>https://github.com/rasitha1/DevOpsCodeReviewAgent</PackageProjectUrl>
@@ -34,8 +34,6 @@
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
 
-    <!-- Suppress Semantic Kernel experimental API warnings -->
-    <NoWarn>$(NoWarn);SKEXP0001;SKEXP0010;SKEXP0020;SKEXP0110</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -45,7 +43,9 @@
 
   <ItemGroup>
     <PackageReference Include="Spectre.Console.Cli" Version="0.55.0" />
-    <PackageReference Include="Microsoft.SemanticKernel" Version="1.76.0" />
+    <PackageReference Include="Azure.AI.OpenAI" Version="2.1.0" />
+    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.7.0" />
+    <PackageReference Include="Microsoft.Agents.AI.Workflows" Version="1.7.0" />
     <PackageReference Include="Azure.Identity" Version="1.21.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.8" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.300" PrivateAssets="All" />

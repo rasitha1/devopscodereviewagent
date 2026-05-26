@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using CodeReviewAgent.Models;
-using Microsoft.SemanticKernel;
 using Spectre.Console;
 
 namespace CodeReviewAgent.Plugins;
@@ -17,7 +16,6 @@ public sealed class ReviewReporterPlugin
 
     public IReadOnlyList<Finding> Findings => _findings.AsReadOnly();
 
-    [KernelFunction("report_finding")]
     [Description("Record a code review finding. Call once per distinct issue found.")]
     public string ReportFinding(
         [Description("Severity: critical, high, medium, low, or info")]

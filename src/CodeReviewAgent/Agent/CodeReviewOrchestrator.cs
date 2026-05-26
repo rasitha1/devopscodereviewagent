@@ -1,27 +1,27 @@
 using CodeReviewAgent.Commands;
 using CodeReviewAgent.Models;
 using CodeReviewAgent.Plugins;
-using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.ChatCompletion;
-using Microsoft.SemanticKernel.Connectors.AzureOpenAI;
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
+using OpenAI.Chat;
 using Spectre.Console;
 
 namespace CodeReviewAgent.Agent;
 
 public sealed class CodeReviewOrchestrator
 {
-    private readonly Kernel _kernel;
+    private readonly ChatClient _chatClient;
     private readonly string _workingDirectory;
     private readonly string _baseBranch;
     private readonly ReviewSettings _settings;
 
     public CodeReviewOrchestrator(
-        Kernel kernel,
+        ChatClient chatClient,
         string workingDirectory,
         string baseBranch,
         ReviewSettings settings)
     {
-        _kernel = kernel;
+        _chatClient = chatClient;
         _workingDirectory = workingDirectory;
         _baseBranch = baseBranch;
         _settings = settings;
@@ -29,57 +29,37 @@ public sealed class CodeReviewOrchestrator
 
     public async Task<ReviewResult> RunAsync(StatusContext statusContext, CancellationToken cancellationToken = default)
     {
-        // Register plugins on this kernel instance
         var shellPlugin = new ShellPlugin(_workingDirectory, statusContext);
         var reporterPlugin = new ReviewReporterPlugin(statusContext);
 
-        _kernel.ImportPluginFromObject(shellPlugin, "Shell");
-        _kernel.ImportPluginFromObject(reporterPlugin, "Review");
+        // Name overrides keep the tool names consistent with the system prompt
+        AIFunction[] tools =
+        [
+            AIFunctionFactory.Create(shellPlugin.RunCommandAsync, "run_command"),
+            AIFunctionFactory.Create(reporterPlugin.ReportFinding, "report_finding")
+        ];
 
-        if (_settings.Verbose)
-            _kernel.FunctionInvocationFilters.Add(new VerboseFilter(statusContext));
-
-        // Build system prompt (pre-injects AGENTS.MD / CLAUDE.MD content if present)
         var promptBuilder = new SystemPromptBuilder(_workingDirectory, _baseBranch);
         var systemPrompt = await promptBuilder.BuildAsync();
 
-        var chatHistory = new ChatHistory(systemPrompt);
-        chatHistory.AddUserMessage(
+        var agent = _chatClient.AsAIAgent(
+            instructions: systemPrompt,
+            tools: tools);
+
+        var session = await agent.CreateSessionAsync();
+
+        var userMessage =
             $"Review all code changes in this repository compared to `{_baseBranch}`. " +
             "Discover changed files with git, review each one, report every finding with report_finding, " +
-            "then write a brief summary.");
-
-        // FunctionChoiceBehavior.Auto() → kernel auto-invokes all registered plugins
-        // until the model stops requesting tool calls.
-        var executionSettings = new AzureOpenAIPromptExecutionSettings
-        {
-            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(),
-            MaxTokens = _settings.MaxTokens
-        };
+            "then write a brief summary.";
 
         statusContext.Status("Code review agent running...");
 
-        var chatService = _kernel.GetRequiredService<IChatCompletionService>();
-        var response = await chatService.GetChatMessageContentAsync(
-            chatHistory, executionSettings, _kernel, cancellationToken);
+        var runOptions = new ChatClientAgentRunOptions(new ChatOptions { MaxOutputTokens = _settings.MaxTokens });
+        var response = await agent.RunAsync(userMessage, session, runOptions, cancellationToken);
 
         return new ReviewResult(
             Findings: reporterPlugin.Findings,
-            Summary: response.Content ?? string.Empty);
-    }
-
-    // Logs the name of each tool call to the spinner status line
-    private sealed class VerboseFilter : IFunctionInvocationFilter
-    {
-        private readonly StatusContext _ctx;
-        public VerboseFilter(StatusContext ctx) => _ctx = ctx;
-
-        public async Task OnFunctionInvocationAsync(
-            FunctionInvocationContext context,
-            Func<FunctionInvocationContext, Task> next)
-        {
-            _ctx.Status($"[grey]{context.Function.PluginName}.{context.Function.Name}[/]");
-            await next(context);
-        }
+            Summary: response.Text ?? string.Empty);
     }
 }

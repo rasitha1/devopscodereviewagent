@@ -69,7 +69,8 @@ public static class AuthDiagnostics
 
                 AnsiConsole.WriteLine();
                 AnsiConsole.MarkupLine("[grey]To verify the RBAC role for this principal, run:[/]");
-                AnsiConsole.MarkupLine($"[grey]  az role assignment list --assignee {Markup.Escape(oid)} --query \"[].roleDefinitionName\" -o table[/]");
+                var rbacCmd = $"az role assignment list --assignee {oid} --query \"[].roleDefinitionName\" -o table";
+                AnsiConsole.MarkupLine($"[grey]  {Markup.Escape(rbacCmd)}[/]");
             }
         }
         catch (Exception ex)

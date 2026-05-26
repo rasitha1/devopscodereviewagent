@@ -2,7 +2,6 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
-using Microsoft.SemanticKernel;
 using Spectre.Console;
 
 namespace CodeReviewAgent.Plugins;
@@ -21,7 +20,6 @@ public sealed class ShellPlugin
         _statusContext = statusContext;
     }
 
-    [KernelFunction("run_command")]
     [Description(
         "Run an OS command to explore the repository. Use git, cat/type, find/dir, grep, dotnet etc. " +
         "Returns stdout and stderr. Output is capped at 15 000 characters. " +

@@ -113,6 +113,18 @@ public sealed class SystemPromptBuilder
             ## What to Look For
 
             **Security** (use severity=critical/high)
+            Before reporting any security finding, confirm you can answer all three:
+            1. What is the exact attack vector? (who does what, under what conditions)
+            2. What does an attacker concretely gain? (data exfiltration, privilege escalation, RCE, etc.)
+            3. Does the code, as written, actually create that exposure — or does it prevent it?
+            If you cannot answer all three with specifics from the code, do not report it.
+
+            Do NOT report security hardening as a vulnerability:
+            - Setting `permissions` to empty or to `contents: read` in GitHub Actions restricts the token — this is best practice, not a risk
+            - Least-privilege job-level grants (e.g. `contents: write` scoped only to a publish job) are correct and intentional
+            - Removing capabilities, tightening scopes, or adding validation are hardening, not vulnerabilities
+
+            Issues to look for:
             - SQL/NoSQL injection: string concatenation or string.Format in queries
             - Hardcoded secrets, API keys, passwords, connection strings in source
             - Missing [Authorize] on new controller actions/minimal-API endpoints

@@ -1,10 +1,10 @@
+using Azure.AI.OpenAI;
 using Azure.Identity;
 using CodeReviewAgent.Agent;
 using CodeReviewAgent.DevOps;
 using CodeReviewAgent.Diagnostics;
 using CodeReviewAgent.Models;
 using CodeReviewAgent.Reporting;
-using Microsoft.SemanticKernel;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
@@ -40,11 +40,10 @@ public sealed class ReviewCommand : AsyncCommand<ReviewSettings>
         if (settings.Verbose)
             await AuthDiagnostics.RunAsync(settings.Endpoint, settings.Deployment, credential, cancellationToken);
 
-        var kernel = Kernel.CreateBuilder()
-            .AddAzureOpenAIChatCompletion(settings.Deployment, settings.Endpoint, credential)
-            .Build();
+        var azureClient = new AzureOpenAIClient(new Uri(settings.Endpoint), credential);
+        var chatClient = azureClient.GetChatClient(settings.Deployment);
 
-        var orchestrator = new CodeReviewOrchestrator(kernel, workingDir, baseBranch, settings);
+        var orchestrator = new CodeReviewOrchestrator(chatClient, workingDir, baseBranch, settings);
 
         ReviewResult result = await AnsiConsole.Status()
             .Spinner(Spinner.Known.Dots)
