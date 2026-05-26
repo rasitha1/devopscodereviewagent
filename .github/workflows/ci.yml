@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+# Restrict GITHUB_TOKEN to read-only for all jobs by default
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build & Test

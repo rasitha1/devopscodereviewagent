@@ -6,6 +6,9 @@ on:
     tags:
       - 'v*.*.*'
 
+# Default to no permissions; the publish job elevates only what it needs
+permissions: {}
+
 jobs:
   publish:
     name: Pack & Publish
