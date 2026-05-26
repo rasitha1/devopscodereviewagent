@@ -24,8 +24,8 @@
     <PackageTags>dotnet;code-review;azure-openai;azure-devops;ai;semantic-kernel;devops;pull-request</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageProjectUrl>https://github.com/rasitha1/CodeReviewAgent</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/rasitha1/CodeReviewAgent</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/rasitha1/DevOpsCodeReviewAgent</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/rasitha1/DevOpsCodeReviewAgent</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
 
     <!-- Embeds source info in the package for debugging -->

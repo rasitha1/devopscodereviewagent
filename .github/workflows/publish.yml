@@ -47,7 +47,7 @@ jobs:
       # Exchanges the GitHub OIDC token for a short-lived NuGet.org API key.
       # The nuget.org Trusted Publisher policy must be configured with:
       #   Repository owner: rasitha1
-      #   Repository:       CodeReviewAgent
+      #   Repository:       DevOpsCodeReviewAgent
       #   Workflow file:    publish.yml
       - name: NuGet login (OIDC → temp API key)
         uses: NuGet/login@v1
