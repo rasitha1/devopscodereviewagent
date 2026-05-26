@@ -12,7 +12,7 @@ namespace CodeReviewAgent.Commands;
 
 public sealed class ReviewCommand : AsyncCommand<ReviewSettings>
 {
-    public override async Task<int> ExecuteAsync(CommandContext context, ReviewSettings settings)
+    protected override async Task<int> ExecuteAsync(CommandContext context, ReviewSettings settings, CancellationToken cancellationToken)
     {
         var workingDir = settings.WorkingDirectory ?? Directory.GetCurrentDirectory();
 
@@ -38,7 +38,7 @@ public sealed class ReviewCommand : AsyncCommand<ReviewSettings>
         var credential = new DefaultAzureCredential();
 
         if (settings.Verbose)
-            await AuthDiagnostics.RunAsync(settings.Endpoint, settings.Deployment, credential);
+            await AuthDiagnostics.RunAsync(settings.Endpoint, settings.Deployment, credential, cancellationToken);
 
         var kernel = Kernel.CreateBuilder()
             .AddAzureOpenAIChatCompletion(settings.Deployment, settings.Endpoint, credential)
@@ -49,7 +49,7 @@ public sealed class ReviewCommand : AsyncCommand<ReviewSettings>
         ReviewResult result = await AnsiConsole.Status()
             .Spinner(Spinner.Known.Dots)
             .SpinnerStyle(Style.Parse("blue"))
-            .StartAsync("Analyzing repository...", ctx => orchestrator.RunAsync(ctx));
+            .StartAsync("Analyzing repository...", ctx => orchestrator.RunAsync(ctx, cancellationToken));
 
         AnsiConsole.WriteLine();
         AnsiConsole.Write(new Rule("[blue]Findings[/]").RuleStyle("blue dim"));
@@ -65,7 +65,7 @@ public sealed class ReviewCommand : AsyncCommand<ReviewSettings>
             var devOpsReporter = new DevOpsCommentReporter(devOpsClient);
             await AnsiConsole.Status()
                 .Spinner(Spinner.Known.Dots)
-                .StartAsync("Posting comments...", _ => devOpsReporter.ReportAsync(result));
+                .StartAsync("Posting comments...", _ => devOpsReporter.ReportAsync(result, cancellationToken));
             AnsiConsole.MarkupLine("[green]Comments posted.[/]");
         }
 

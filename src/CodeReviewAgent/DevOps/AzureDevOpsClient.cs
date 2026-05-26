@@ -34,9 +34,9 @@ public sealed class AzureDevOpsClient : IDisposable
     /// When filePath is provided the thread is anchored to that file in the diff view.
     /// When line is also provided the thread is anchored to that specific line.
     /// </summary>
-    public async Task PostCommentAsync(string markdownContent, string? filePath = null, int? line = null)
+    public async Task PostCommentAsync(string markdownContent, string? filePath = null, int? line = null, CancellationToken cancellationToken = default)
     {
-        var token = await GetTokenAsync();
+        var token = await GetTokenAsync(cancellationToken);
 
         var body = BuildBody(markdownContent, filePath, line);
 
@@ -47,14 +47,14 @@ public sealed class AzureDevOpsClient : IDisposable
             Encoding.UTF8,
             "application/json");
 
-        using var response = await _http.SendAsync(request);
+        using var response = await _http.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
-    private async Task<string> GetTokenAsync()
+    private async Task<string> GetTokenAsync(CancellationToken cancellationToken)
     {
         var ctx = new TokenRequestContext([$"{AzureDevOpsResource}/.default"]);
-        var result = await _credential.GetTokenAsync(ctx);
+        var result = await _credential.GetTokenAsync(ctx, cancellationToken);
         return result.Token;
     }
 

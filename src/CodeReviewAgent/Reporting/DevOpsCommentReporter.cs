@@ -10,7 +10,7 @@ public sealed class DevOpsCommentReporter
 
     public DevOpsCommentReporter(AzureDevOpsClient client) => _client = client;
 
-    public async Task ReportAsync(ReviewResult result)
+    public async Task ReportAsync(ReviewResult result, CancellationToken cancellationToken = default)
     {
         // Per-file inline threads (one thread per file, listing all findings for that file)
         var byFile = result.Findings
@@ -24,12 +24,12 @@ public sealed class DevOpsCommentReporter
             var content = BuildFileComment(fileGroup.Key, findings);
             // Anchor thread to the line of the highest-severity finding
             var anchorLine = findings.FirstOrDefault(f => f.Line.HasValue)?.Line;
-            await _client.PostCommentAsync(content, fileGroup.Key, anchorLine);
+            await _client.PostCommentAsync(content, fileGroup.Key, anchorLine, cancellationToken);
         }
 
         // Top-level PR summary thread
         var summaryContent = BuildSummaryComment(result);
-        await _client.PostCommentAsync(summaryContent);
+        await _client.PostCommentAsync(summaryContent, cancellationToken: cancellationToken);
     }
 
     private static string BuildFileComment(string file, IList<Finding> findings)

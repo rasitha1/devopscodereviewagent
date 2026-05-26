@@ -27,7 +27,7 @@ public sealed class CodeReviewOrchestrator
         _settings = settings;
     }
 
-    public async Task<ReviewResult> RunAsync(StatusContext statusContext)
+    public async Task<ReviewResult> RunAsync(StatusContext statusContext, CancellationToken cancellationToken = default)
     {
         // Register plugins on this kernel instance
         var shellPlugin = new ShellPlugin(_workingDirectory, statusContext);
@@ -61,7 +61,7 @@ public sealed class CodeReviewOrchestrator
 
         var chatService = _kernel.GetRequiredService<IChatCompletionService>();
         var response = await chatService.GetChatMessageContentAsync(
-            chatHistory, executionSettings, _kernel);
+            chatHistory, executionSettings, _kernel, cancellationToken);
 
         return new ReviewResult(
             Findings: reporterPlugin.Findings,

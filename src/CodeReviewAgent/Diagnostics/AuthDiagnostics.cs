@@ -16,7 +16,7 @@ public static class AuthDiagnostics
     /// Useful for confirming which identity DefaultAzureCredential resolved and
     /// whether that identity has access to the target resource.
     /// </summary>
-    public static async Task RunAsync(string endpoint, string deployment, TokenCredential credential)
+    public static async Task RunAsync(string endpoint, string deployment, TokenCredential credential, CancellationToken cancellationToken = default)
     {
         AnsiConsole.Write(new Rule("[grey]Auth Diagnostics[/]").RuleStyle("grey dim"));
 
@@ -28,7 +28,7 @@ public static class AuthDiagnostics
         try
         {
             var ctx = new TokenRequestContext([AzureOpenAIScope]);
-            var token = await credential.GetTokenAsync(ctx, CancellationToken.None);
+            var token = await credential.GetTokenAsync(ctx, cancellationToken);
 
             AnsiConsole.MarkupLine("[green]Token acquired successfully[/]");
             AnsiConsole.MarkupLine($"[grey]Expires   :[/] {token.ExpiresOn:u}");
