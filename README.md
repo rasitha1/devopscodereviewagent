@@ -170,7 +170,7 @@ dotnet tool install --global --add-source ./nupkg rasitha.DevOpsCodeReviewAgent
 
 | Component | Technology |
 |-----------|-----------|
-| Runtime | .NET 9 |
+| Runtime | .NET 10 |
 | CLI | Spectre.Console.Cli |
 | Agent loop | Semantic Kernel 1.76 with `FunctionChoiceBehavior.Auto()` |
 | Auth | `DefaultAzureCredential` (Azure.Identity) |

@@ -44,7 +44,7 @@ steps:
     displayName: Use .NET 9
     inputs:
       packageType: sdk
-      version: 9.0.x
+      version: 10.0.x
 
   # Install from nuget.org (or replace --source with your internal feed URL)
   - task: DotNetCoreCLI@2
