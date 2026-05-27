@@ -4,7 +4,7 @@ An AI-powered .NET code review agent that runs as a global CLI tool inside Azure
 
 ## How it works
 
-The tool runs an agentic loop powered by Semantic Kernel. Given an Azure OpenAI endpoint, it:
+The tool runs an agentic loop powered by the [Microsoft Agent Framework (MAF)](https://github.com/microsoft/Agents-for-net). Given an Azure OpenAI endpoint, it:
 
 1. Uses `git diff` to discover what changed in the PR
 2. Reads any repository review guidelines (`AGENTS.MD`, `CLAUDE.MD`, `.cursorrules`, etc.) and honours them
@@ -172,6 +172,6 @@ dotnet tool install --global --add-source ./nupkg rasitha.DevOpsCodeReviewAgent
 |-----------|-----------|
 | Runtime | .NET 10 |
 | CLI | Spectre.Console.Cli |
-| Agent loop | Semantic Kernel 1.76 with `FunctionChoiceBehavior.Auto()` |
+| Agent loop | Microsoft Agent Framework 1.7 (`Microsoft.Agents.AI`) |
 | Auth | `DefaultAzureCredential` (Azure.Identity) |
 | ADO comments | Azure DevOps REST API 7.1 via `AzureCliCredential` |

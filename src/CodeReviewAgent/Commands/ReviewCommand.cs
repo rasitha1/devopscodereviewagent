@@ -7,6 +7,7 @@ using CodeReviewAgent.Models;
 using CodeReviewAgent.Reporting;
 using Spectre.Console;
 using Spectre.Console.Cli;
+using System.ClientModel;
 
 namespace CodeReviewAgent.Commands;
 
@@ -45,10 +46,19 @@ public sealed class ReviewCommand : AsyncCommand<ReviewSettings>
 
         var orchestrator = new CodeReviewOrchestrator(chatClient, workingDir, baseBranch, settings);
 
-        ReviewResult result = await AnsiConsole.Status()
-            .Spinner(Spinner.Known.Dots)
-            .SpinnerStyle(Style.Parse("blue"))
-            .StartAsync("Analyzing repository...", ctx => orchestrator.RunAsync(ctx, cancellationToken));
+        ReviewResult result;
+        try
+        {
+            result = await AnsiConsole.Status()
+                .Spinner(Spinner.Known.Dots)
+                .SpinnerStyle(Style.Parse("blue"))
+                .StartAsync("Analyzing repository...", ctx => orchestrator.RunAsync(ctx, cancellationToken));
+        }
+        catch (ClientResultException ex)
+        {
+            AnsiConsole.WriteLine();
+            return HandleClientError(ex, settings.Verbose);
+        }
 
         AnsiConsole.WriteLine();
         AnsiConsole.Write(new Rule("[blue]Findings[/]").RuleStyle("blue dim"));
@@ -69,6 +79,72 @@ public sealed class ReviewCommand : AsyncCommand<ReviewSettings>
         }
 
         return ComputeExitCode(result, settings.FailOn);
+    }
+
+    private static int HandleClientError(ClientResultException ex, bool verbose)
+    {
+        AnsiConsole.MarkupLine($"[red]Azure OpenAI request failed:[/] HTTP {ex.Status}");
+        AnsiConsole.WriteLine();
+
+        switch (ex.Status)
+        {
+            case 401:
+                AnsiConsole.MarkupLine("[yellow]The identity does not have permission to call this Azure OpenAI resource.[/]");
+                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine("Things to check:");
+                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine("  [bold]1. RBAC role[/]");
+                AnsiConsole.MarkupLine("     The identity needs [bold]Cognitive Services OpenAI User[/] (or Contributor) on the Azure OpenAI resource.");
+                AnsiConsole.MarkupLine("     Note: subscription- or resource-group-level assignments are not enough — the role must be on the resource itself.");
+                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine("  [bold]2. Verify the current identity[/]");
+                AnsiConsole.WriteLine("     az account show");
+                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine("  [bold]3. List role assignments for the identity[/]");
+                AnsiConsole.WriteLine("     az role assignment list --assignee <object-id> --scope <resource-id> --query \"[].roleDefinitionName\" -o table");
+                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine("  [bold]4. In Azure Pipelines[/]");
+                AnsiConsole.MarkupLine("     Grant the service connection's managed identity the role in the Azure OpenAI resource's IAM blade.");
+                AnsiConsole.WriteLine();
+                if (!verbose)
+                    AnsiConsole.MarkupLine("[grey]Tip: rerun with --verbose to see which identity DefaultAzureCredential resolved.[/]");
+                break;
+
+            case 403:
+                AnsiConsole.MarkupLine("[yellow]Access forbidden (403). The identity is authenticated but blocked by a policy or network rule.[/]");
+                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine("Things to check:");
+                AnsiConsole.MarkupLine("  - Azure OpenAI resource firewall / virtual network rules");
+                AnsiConsole.MarkupLine("  - Azure Policy denying the action");
+                AnsiConsole.MarkupLine("  - Content filtering policy rejecting the request");
+                break;
+
+            case 404:
+                AnsiConsole.MarkupLine("[yellow]Resource or deployment not found (404).[/]");
+                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine("Things to check:");
+                AnsiConsole.MarkupLine("  - The --endpoint URL matches the Azure OpenAI resource (not a generic Azure endpoint)");
+                AnsiConsole.MarkupLine("  - The --deployment name matches a deployed model in that resource");
+                AnsiConsole.MarkupLine("  - The deployment is in a 'Succeeded' state in the Azure portal");
+                break;
+
+            case 429:
+                AnsiConsole.MarkupLine("[yellow]Rate limit or quota exceeded (429).[/]");
+                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine("Things to check:");
+                AnsiConsole.MarkupLine("  - Tokens-per-minute (TPM) quota for the deployment");
+                AnsiConsole.MarkupLine("  - Request-per-minute (RPM) limit");
+                AnsiConsole.MarkupLine("  - Consider increasing the quota in Azure AI Foundry or using a deployment with higher capacity");
+                break;
+
+            default:
+                AnsiConsole.MarkupLine("[grey]Details:[/]");
+                AnsiConsole.WriteLine(Markup.Escape(ex.Message));
+                break;
+        }
+
+        AnsiConsole.WriteLine();
+        return 1;
     }
 
     private static string ResolveBaseBranch(string? explicitValue)
