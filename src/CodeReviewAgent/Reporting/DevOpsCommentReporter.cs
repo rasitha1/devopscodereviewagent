@@ -1,72 +1,87 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using CodeReviewAgent.DevOps;
 using CodeReviewAgent.Models;
 
 namespace CodeReviewAgent.Reporting;
 
-public sealed class DevOpsCommentReporter
+public sealed partial class DevOpsCommentReporter
 {
+    // Common prefix used to identify any thread posted by this agent.
+    private const string MarkerPrefix = "<!-- ai-code-review-agent";
+
+    // Marker for the top-level summary thread.
+    private const string SummaryMarker = "<!-- ai-code-review-agent summary -->";
+
+    // Per-finding marker embeds file and title so we can fingerprint it on re-runs.
+    // title replaces " with ' to avoid breaking the HTML attribute.
+    private static string FindingMarker(string file, string title) =>
+        $"<!-- ai-code-review-agent file=\"{file.Replace('\\', '/')}\" title=\"{title.Replace('"', '\'')}\" -->";
+
     private readonly AzureDevOpsClient _client;
 
     public DevOpsCommentReporter(AzureDevOpsClient client) => _client = client;
 
     public async Task ReportAsync(ReviewResult result, CancellationToken cancellationToken = default)
     {
-        // Per-file inline threads (one thread per file, listing all findings for that file)
-        var byFile = result.Findings
-            .Where(f => !string.IsNullOrWhiteSpace(f.File))
-            .GroupBy(f => f.File, StringComparer.OrdinalIgnoreCase)
-            .OrderBy(g => g.Key);
+        var existingThreads = await _client.GetThreadsAsync(cancellationToken);
 
-        foreach (var fileGroup in byFile)
+        // Build suppression set from threads the developer explicitly resolved as won't-fix/by-design,
+        // and close everything else so fresh results replace them.
+        var suppressed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (id, status, content) in existingThreads)
         {
-            var findings = fileGroup.OrderByDescending(f => f.Severity).ToList();
-            var content = BuildFileComment(fileGroup.Key, findings);
-            // Anchor thread to the line of the highest-severity finding
-            var anchorLine = findings.FirstOrDefault(f => f.Line.HasValue)?.Line;
-            await _client.PostCommentAsync(content, fileGroup.Key, anchorLine, cancellationToken);
+            if (!content.Contains(MarkerPrefix)) continue;
+
+            if (status is "wontFix" or "byDesign")
+            {
+                // Developer decision — extract fingerprint and honour it, leave the thread alone
+                var fp = ParseFindingMarker(content);
+                if (fp.HasValue)
+                    suppressed.Add(FingerprintKey(fp.Value.File, fp.Value.Title));
+            }
+            else
+            {
+                // Active / fixed / closed / pending — close so we can repost fresh results
+                await _client.ResolveThreadAsync(id, cancellationToken);
+            }
         }
 
-        // Top-level PR summary thread
-        var summaryContent = BuildSummaryComment(result);
-        await _client.PostCommentAsync(summaryContent, cancellationToken: cancellationToken);
+        // Post one thread per finding, anchored to its file and line (skip suppressed ones)
+        foreach (var finding in result.Findings.Where(f => !string.IsNullOrWhiteSpace(f.File)))
+        {
+            if (suppressed.Contains(FingerprintKey(finding.File, finding.Title))) continue;
+            await _client.PostCommentAsync(BuildFindingComment(finding), finding.File, finding.Line, cancellationToken);
+        }
+
+        // Summary thread — always refreshed
+        await _client.PostCommentAsync(BuildSummaryComment(result, suppressed.Count), cancellationToken: cancellationToken);
     }
 
-    private static string BuildFileComment(string file, IList<Finding> findings)
+    private static string BuildFindingComment(Finding f)
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"### AI Code Review — `{file}`");
+        sb.AppendLine(FindingMarker(f.File, f.Title));
+        var loc = f.Line.HasValue ? $" (line {f.Line})" : string.Empty;
+        sb.AppendLine($"### {f.Severity}: {EscapeMd(f.Title)}{loc}");
         sb.AppendLine();
-
-        // Quick table
-        sb.AppendLine("| Severity | Line | Category | Issue |");
-        sb.AppendLine("|----------|------|----------|-------|");
-        foreach (var f in findings)
-            sb.AppendLine($"| **{f.Severity}** | {f.Line?.ToString() ?? "—"} | {f.Category} | {EscapeMd(f.Title)} |");
-
+        sb.AppendLine($"**Category:** {f.Category}  |  **File:** `{f.File}`");
         sb.AppendLine();
-
-        // Full detail for each finding
-        foreach (var f in findings)
-        {
-            var loc = f.Line.HasValue ? $" (line {f.Line})" : string.Empty;
-            sb.AppendLine($"#### {f.Severity}: {EscapeMd(f.Title)}{loc}");
-            sb.AppendLine();
-            sb.AppendLine(f.Description);
-            sb.AppendLine();
-            sb.AppendLine("**Suggested fix:**");
-            sb.AppendLine(f.Suggestion);
-            sb.AppendLine();
-        }
-
+        sb.AppendLine(f.Description);
+        sb.AppendLine();
+        sb.AppendLine("**Suggested fix:**");
+        sb.AppendLine(f.Suggestion);
+        sb.AppendLine();
         sb.AppendLine("---");
         sb.Append("*Posted by AI Code Review Agent*");
         return sb.ToString();
     }
 
-    private static string BuildSummaryComment(ReviewResult result)
+    private static string BuildSummaryComment(ReviewResult result, int suppressedCount)
     {
         var sb = new StringBuilder();
+        sb.AppendLine(SummaryMarker);
         sb.AppendLine("## AI Code Review Summary");
         sb.AppendLine();
 
@@ -103,6 +118,12 @@ public sealed class DevOpsCommentReporter
             sb.AppendLine();
         }
 
+        if (suppressedCount > 0)
+        {
+            sb.AppendLine($"> **{suppressedCount} finding(s) suppressed** — marked WontFix or ByDesign in a previous run and not re-posted.");
+            sb.AppendLine();
+        }
+
         if (!string.IsNullOrWhiteSpace(result.Summary))
         {
             sb.AppendLine("### Agent Notes");
@@ -115,6 +136,19 @@ public sealed class DevOpsCommentReporter
         return sb.ToString();
     }
 
-    // Escape pipe characters so they don't break markdown tables
+    private static (string File, string Title)? ParseFindingMarker(string content)
+    {
+        var m = FindingMarkerRegex().Match(content);
+        if (!m.Success) return null;
+        return (m.Groups[1].Value, m.Groups[2].Value);
+    }
+
+    // Fingerprint is file (normalised, lowercase) + title (lowercase) — robust to line number drift
+    private static string FingerprintKey(string file, string title) =>
+        $"{file.Replace('\\', '/').ToLowerInvariant()}|{title.ToLowerInvariant()}";
+
+    [GeneratedRegex(@"<!-- ai-code-review-agent file=""([^""]*)"" title=""([^""]*)"" -->")]
+    private static partial Regex FindingMarkerRegex();
+
     private static string EscapeMd(string s) => s.Replace("|", "\\|");
 }
