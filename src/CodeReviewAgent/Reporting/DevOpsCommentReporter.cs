@@ -54,7 +54,8 @@ public sealed class DevOpsCommentReporter
             sb.AppendLine();
             sb.AppendLine(f.Description);
             sb.AppendLine();
-            sb.AppendLine($"> **Suggested fix:** {f.Suggestion}");
+            sb.AppendLine("**Suggested fix:**");
+            sb.AppendLine(f.Suggestion);
             sb.AppendLine();
         }
 

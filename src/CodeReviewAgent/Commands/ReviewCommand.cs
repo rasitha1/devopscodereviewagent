@@ -78,7 +78,13 @@ public sealed class ReviewCommand : AsyncCommand<ReviewSettings>
             AnsiConsole.MarkupLine("[green]Comments posted.[/]");
         }
 
-        return ComputeExitCode(result, settings.FailOn);
+        var exitCode = ComputeExitCode(result, settings.FailOn);
+        if (exitCode != 0)
+        {
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine($"[red]Failing build:[/] findings at or above [bold]{settings.FailOn}[/] severity were detected (--fail-on {settings.FailOn}).");
+        }
+        return exitCode;
     }
 
     private static int HandleClientError(ClientResultException ex, bool verbose)
