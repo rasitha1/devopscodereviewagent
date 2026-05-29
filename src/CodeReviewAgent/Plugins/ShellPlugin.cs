@@ -82,14 +82,16 @@ public sealed class ShellPlugin
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             psi.FileName = "cmd.exe";
-            psi.Arguments = $"/c {command}";
+            psi.ArgumentList.Add("/d");
+            psi.ArgumentList.Add("/s");
+            psi.ArgumentList.Add("/c");
+            psi.ArgumentList.Add(command);
         }
         else
         {
-            // Single-quote the command so bash receives it verbatim;
-            // escape any single quotes already in the command string.
             psi.FileName = "/bin/sh";
-            psi.Arguments = $"-c '{command.Replace("'", "'\\''")}'";
+            psi.ArgumentList.Add("-c");
+            psi.ArgumentList.Add(command);
         }
 
         return psi;

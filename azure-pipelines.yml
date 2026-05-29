@@ -4,7 +4,7 @@
 # =============
 # 1. Publish the tool to a NuGet feed (internal or nuget.org):
 #      dotnet pack src/CodeReviewAgent/CodeReviewAgent.csproj -c Release -o ./nupkg
-#      dotnet nuget push ./nupkg/rasitha.DevOpsCodeReviewAgent.1.0.0.nupkg --source <your-feed>
+#      dotnet nuget push ./nupkg/rasitha.DevOpsCodeReviewAgent.*.nupkg --source <your-feed>
 #
 # 2. Create an Azure service connection (service principal) that has:
 #      - Azure OpenAI: "Cognitive Services OpenAI User" role on the OpenAI resource
@@ -52,9 +52,11 @@ steps:
     inputs:
       command: custom
       custom: tool
-      arguments: install --global rasitha.DevOpsCodeReviewAgent --version 1.0.0
+      arguments: install --global rasitha.DevOpsCodeReviewAgent
     # To install from an internal feed, add:
-    #   arguments: install --global rasitha.DevOpsCodeReviewAgent --version 1.0.0 --add-source https://pkgs.dev.azure.com/<org>/<project>/_packaging/<feed>/nuget/v3/index.json
+    #   arguments: install --global rasitha.DevOpsCodeReviewAgent --add-source https://pkgs.dev.azure.com/<org>/<project>/_packaging/<feed>/nuget/v3/index.json
+    # To pin a specific published release for reproducibility, add:
+    #   --version 1.3.2
 
   - task: AzureCLI@2
     displayName: Run AI Code Review
