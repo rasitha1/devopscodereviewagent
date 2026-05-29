@@ -22,7 +22,7 @@
     <Title>AI Code Review</Title>
     <Description>AI-powered .NET code review agent for Azure Pipelines. Uses Azure OpenAI with Entra authentication to autonomously review pull requests and post inline findings as Azure DevOps PR comments.</Description>
     <PackageTags>dotnet;code-review;azure-openai;azure-devops;ai;agent-framework;devops;pull-request</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageProjectUrl>https://github.com/rasitha1/DevOpsCodeReviewAgent</PackageProjectUrl>
     <RepositoryUrl>https://github.com/rasitha1/DevOpsCodeReviewAgent</RepositoryUrl>
@@ -37,8 +37,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Bundle the README so NuGet.org renders it on the package page -->
+    <!-- Bundle the README and license so NuGet consumers get the full package metadata -->
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\LICENSE.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <ItemGroup>

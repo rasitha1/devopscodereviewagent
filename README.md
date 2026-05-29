@@ -170,6 +170,8 @@ dotnet pack src/CodeReviewAgent/CodeReviewAgent.csproj -c Release -o ./nupkg
 dotnet tool install --global --add-source ./nupkg rasitha.DevOpsCodeReviewAgent
 ```
 
+The NuGet package uses the SPDX license expression `Apache-2.0` and also includes both `README.md` and the repository `LICENSE.md` file.
+
 ## Tech stack
 
 | Component | Technology |
