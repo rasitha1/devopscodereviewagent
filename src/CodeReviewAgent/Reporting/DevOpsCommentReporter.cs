@@ -22,6 +22,24 @@ public sealed partial class DevOpsCommentReporter
 
     public DevOpsCommentReporter(AzureDevOpsClient client) => _client = client;
 
+    public static async Task DryRunAsync(ReviewResult result, string outputDir)
+    {
+        Directory.CreateDirectory(outputDir);
+        foreach (var f in Directory.GetFiles(outputDir, "*.md"))
+            File.Delete(f);
+
+        var findings = result.Findings.Where(f => !string.IsNullOrWhiteSpace(f.File)).ToList();
+        for (var i = 0; i < findings.Count; i++)
+        {
+            var finding = findings[i];
+            var anchor = finding.Line.HasValue ? $":{finding.Line}" : "";
+            var header = $"<!-- dry-run: would post inline thread on {finding.File}{anchor} -->\n\n";
+            await File.WriteAllTextAsync(Path.Combine(outputDir, $"finding-{i + 1:000}.md"), header + BuildFindingComment(finding));
+        }
+
+        await File.WriteAllTextAsync(Path.Combine(outputDir, "summary.md"), BuildSummaryComment(result, 0));
+    }
+
     public async Task ReportAsync(ReviewResult result, CancellationToken cancellationToken = default)
     {
         var existingThreads = await _client.GetThreadsAsync(cancellationToken);
@@ -71,9 +89,7 @@ public sealed partial class DevOpsCommentReporter
         sb.AppendLine(f.Description);
         sb.AppendLine();
         sb.AppendLine("**Suggested fix:**");
-        sb.AppendLine("```suggestion");
-        sb.AppendLine(NormalizeSuggestionContent(f.Suggestion));
-        sb.AppendLine("```");
+        sb.AppendLine(f.Suggestion);
         sb.AppendLine();
         sb.AppendLine("---");
         sb.Append("*Posted by AI Code Review Agent*");
@@ -151,32 +167,6 @@ public sealed partial class DevOpsCommentReporter
 
     [GeneratedRegex(@"<!-- ai-code-review-agent file=""([^""]*)"" title=""([^""]*)"" -->")]
     private static partial Regex FindingMarkerRegex();
-
-    private static string NormalizeSuggestionContent(string suggestion)
-    {
-        var trimmed = suggestion.Trim();
-
-        if (!trimmed.StartsWith("```", StringComparison.Ordinal))
-            return trimmed;
-
-        var firstNewline = trimmed.IndexOf('\n');
-        if (firstNewline < 0)
-            return trimmed;
-
-        var openingFence = trimmed[..firstNewline].TrimEnd('\r');
-        if (!openingFence.StartsWith("```", StringComparison.Ordinal))
-            return trimmed;
-
-        var closingFenceIndex = trimmed.LastIndexOf("```", StringComparison.Ordinal);
-        if (closingFenceIndex <= firstNewline)
-            return trimmed;
-
-        var trailingContent = trimmed[(closingFenceIndex + 3)..].Trim();
-        if (trailingContent.Length > 0)
-            return trimmed;
-
-        return trimmed[(firstNewline + 1)..closingFenceIndex].Trim('\r', '\n');
-    }
 
     private static string EscapeMd(string s) => s.Replace("|", "\\|");
 }

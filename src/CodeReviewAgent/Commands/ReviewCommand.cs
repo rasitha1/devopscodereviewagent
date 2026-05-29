@@ -26,10 +26,12 @@ public sealed class ReviewCommand : AsyncCommand<ReviewSettings>
         var baseBranch = ResolveBaseBranch(settings.BaseBranch);
         var devOpsContext = ResolveDevOpsContext(settings);
 
+        var currentBranch = GetCurrentBranch(workingDir);
+
         AnsiConsole.Write(new Rule("[blue]AI Code Review[/]").RuleStyle("blue dim"));
         AnsiConsole.MarkupLine($"[grey]Endpoint  :[/] {settings.Endpoint}");
         AnsiConsole.MarkupLine($"[grey]Deployment:[/] {settings.Deployment}");
-        AnsiConsole.MarkupLine($"[grey]Base branch:[/] {baseBranch}");
+        AnsiConsole.MarkupLine($"[grey]Branch    :[/] {currentBranch} → {baseBranch}");
         AnsiConsole.MarkupLine($"[grey]Directory :[/] {workingDir}");
         if (devOpsContext is not null)
             AnsiConsole.MarkupLine($"[grey]PR comments:[/] {devOpsContext.Organization}/{devOpsContext.Project} PR#{devOpsContext.PullRequestId}");
@@ -66,7 +68,18 @@ public sealed class ReviewCommand : AsyncCommand<ReviewSettings>
         var consoleReporter = new ConsoleReporter();
         consoleReporter.Report(result);
 
-        if (devOpsContext is not null)
+        if (settings.DryRun)
+        {
+            var dryRunDir = Path.GetFullPath(settings.DryRunDir ?? Path.Combine(workingDir, "ai-review-dry-run"));
+            AnsiConsole.WriteLine();
+            AnsiConsole.Write(new Rule("[blue]Dry Run — DevOps Comment Preview[/]").RuleStyle("blue dim"));
+            await AnsiConsole.Status()
+                .Spinner(Spinner.Known.Dots)
+                .StartAsync("Writing comment files...", _ => DevOpsCommentReporter.DryRunAsync(result, dryRunDir));
+            AnsiConsole.MarkupLine($"[green]Written to:[/] {dryRunDir}");
+            AnsiConsole.MarkupLine($"[grey]{result.Findings.Count} finding file(s) + summary.md[/]");
+        }
+        else if (devOpsContext is not null)
         {
             AnsiConsole.WriteLine();
             AnsiConsole.Write(new Rule("[blue]Posting to Azure DevOps[/]").RuleStyle("blue dim"));
@@ -185,6 +198,28 @@ public sealed class ReviewCommand : AsyncCommand<ReviewSettings>
         }
 
         return new DevOpsContext(org, project, repo, prId);
+    }
+
+    private static string GetCurrentBranch(string workingDir)
+    {
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo("git", "branch --show-current")
+            {
+                WorkingDirectory = workingDir,
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            using var proc = System.Diagnostics.Process.Start(psi);
+            var output = proc?.StandardOutput.ReadToEnd().Trim();
+            proc?.WaitForExit();
+            return string.IsNullOrEmpty(output) ? "(detached HEAD)" : output;
+        }
+        catch
+        {
+            return "(unknown)";
+        }
     }
 
     // https://dev.azure.com/{org}/ → org

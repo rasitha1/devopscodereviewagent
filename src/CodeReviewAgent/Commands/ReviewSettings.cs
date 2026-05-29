@@ -47,6 +47,15 @@ public sealed class ReviewSettings : CommandSettings
     [DefaultValue("none")]
     public string FailOn { get; init; } = "none";
 
+    [CommandOption("--dry-run")]
+    [Description("Write DevOps comment markdown to files instead of posting (implies --devops-comment formatting, no credentials needed)")]
+    [DefaultValue(false)]
+    public bool DryRun { get; init; }
+
+    [CommandOption("--dry-run-dir <DIR>")]
+    [Description("Directory to write dry-run comment files (default: ai-review-dry-run in working directory)")]
+    public string? DryRunDir { get; init; }
+
     [CommandOption("--verbose|-v")]
     [Description("Print each tool call name as the agent works")]
     [DefaultValue(false)]
