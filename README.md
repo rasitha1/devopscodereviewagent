@@ -8,7 +8,7 @@ The tool runs an agentic loop powered by the [Microsoft Agent Framework (MAF)](h
 
 1. Uses `git diff` to discover what changed in the PR
 2. Reads any repository review guidelines (`AGENTS.MD`, `CLAUDE.MD`, `.cursorrules`, etc.) and honours them
-3. Reviews each changed file using targeted git and shell commands — it does not load entire files into context
+3. Detects the current OS/shell and reviews each changed file using targeted git and shell commands appropriate for that environment
 4. Calls `report_finding` for every issue it finds (bugs, security vulnerabilities, performance problems, .NET anti-patterns)
 5. Posts findings as inline threads on the Azure DevOps PR, grouped by file, plus a top-level summary comment
 
@@ -17,15 +17,17 @@ Authentication uses `DefaultAzureCredential` throughout — no API keys or PATs 
 ## Installation
 
 ```bash
-dotnet tool install --global rasitha.DevOpsCodeReviewAgent --version 1.0.0
+dotnet tool install --global rasitha.DevOpsCodeReviewAgent
 ```
 
 To install from a private feed:
 
 ```bash
-dotnet tool install --global rasitha.DevOpsCodeReviewAgent --version 1.0.0 \
+dotnet tool install --global rasitha.DevOpsCodeReviewAgent \
   --add-source https://pkgs.dev.azure.com/<org>/<project>/_packaging/<feed>/nuget/v3/index.json
 ```
+
+If you want reproducible installs, pin an explicit published version such as `--version 1.3.2`.
 
 ## Usage
 
@@ -91,6 +93,8 @@ Add to your PR validation pipeline. The `AzureCLI@2` task logs in with the servi
 ```
 
 The tool auto-detects the PR context (base branch, PR ID, org, project, repository) from the Azure Pipelines environment variables that the platform sets on PR builds.
+
+On Windows agents, the reviewer tells the model to use Windows-compatible commands instead of assuming Unix tools like `sed`. On Linux agents, commands are executed through `/bin/sh`.
 
 See [`azure-pipelines.yml`](azure-pipelines.yml) for a complete pipeline example with setup notes.
 

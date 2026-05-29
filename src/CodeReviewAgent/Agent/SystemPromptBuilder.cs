@@ -1,4 +1,5 @@
 using System.Text;
+using System.Runtime.InteropServices;
 
 namespace CodeReviewAgent.Agent;
 
@@ -57,6 +58,18 @@ public sealed class SystemPromptBuilder
     private string Compose(string? configSection)
     {
         var sb = new StringBuilder();
+        var isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+        var shellName = isWindows ? "cmd.exe" : "/bin/sh";
+        var osName = isWindows ? "Windows" : "Linux/Unix";
+        var fileReadExample = isWindows
+            ? @"type path\to\file.cs"
+            : "cat path/to/file.cs";
+        var firstLinesExample = isWindows
+            ? @"powershell -NoProfile -Command ""Get-Content 'src\Model\TimeService.cs' | Select-Object -First 220"""
+            : "sed -n '1,220p' src/Model/TimeService.cs";
+        var textSearchExample = isWindows
+            ? @"findstr /n /c:""TimeService"" src\Model\TimeService.cs"
+            : "grep -n 'TimeService' src/Model/TimeService.cs";
 
         sb.AppendLine("""
             You are an expert .NET code reviewer running inside a CI/CD pipeline.
@@ -72,6 +85,17 @@ public sealed class SystemPromptBuilder
         sb.AppendLine("## Context");
         sb.AppendLine($"- Working directory: `{_workingDirectory}`");
         sb.AppendLine($"- Base branch: `{_baseBranch}`");
+        sb.AppendLine($"- Operating system: `{osName}`");
+        sb.AppendLine($"- Command shell: `{shellName}`");
+        sb.AppendLine();
+
+        sb.AppendLine("## Command Environment");
+        sb.AppendLine("- Use commands that match the current shell and OS.");
+        sb.AppendLine("- Do not assume Linux utilities exist on Windows.");
+        sb.AppendLine("- Prefer Git plus native shell commands for targeted inspection.");
+        sb.AppendLine($"- Read a file: `{fileReadExample}`");
+        sb.AppendLine($"- Read the first lines of a file: `{firstLinesExample}`");
+        sb.AppendLine($"- Search within a file: `{textSearchExample}`");
         sb.AppendLine();
 
         if (configSection is not null)
