@@ -101,6 +101,8 @@ public sealed class SystemPromptBuilder
         if (configSection is not null)
         {
             sb.AppendLine(configSection);
+            sb.AppendLine("If any guideline file above references additional files via markdown links (e.g. `[name](./path/to/file.md)`), read those files with `run_command` before starting the review workflow.");
+            sb.AppendLine();
         }
 
         sb.AppendLine($"""
