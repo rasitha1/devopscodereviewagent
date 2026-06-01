@@ -118,21 +118,27 @@ public sealed class SystemPromptBuilder
             ```
             git diff origin/{_baseBranch}...HEAD --name-only
             ```
-            If that fails (e.g. origin not fetched), try:
+            If that fails (origin ref not available), fall back to the merge commit's first parent,
+            which in Azure Pipelines PR builds is always the target branch tip:
             ```
-            git diff HEAD~1 --name-only
+            git diff HEAD^1...HEAD --name-only
+            ```
+            If that also fails, inspect the log to understand the repo state:
+            ```
             git log --oneline -5
             ```
 
             ### 3. Get High-Level Diff Stats
+            Use the same base ref that worked in step 2 (`origin/{_baseBranch}` or `HEAD^1`):
             ```
             git diff origin/{_baseBranch}...HEAD --stat
             ```
 
             ### 4. Review Each Changed File
             For every changed file (skip: *.g.cs, *.Designer.cs, Migrations/*.cs, package-lock.json, *.min.js):
-            1. Read the diff first:
+            1. Read the diff first using the same base ref that worked in step 2:
                `git diff origin/{_baseBranch}...HEAD -- "path/to/file.cs"`
+               or if falling back: `git diff HEAD^1...HEAD -- "path/to/file.cs"`
             2. If you need more context (e.g. the full method body), read only those lines:
                `git show HEAD:path/to/file.cs | head -n 200`  (or use grep to find a specific region)
             3. Check related files only when a change creates an obvious contract risk.

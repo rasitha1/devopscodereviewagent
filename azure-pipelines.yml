@@ -11,10 +11,6 @@
 #      - Azure DevOps: added to the project as a member with "Contribute to pull requests"
 #        permission on this repository (Project Settings → Repos → Security)
 #
-# 3. Add pipeline variables (or variable group):
-#      AZURE_OPENAI_ENDPOINT   e.g. https://my-resource.openai.azure.com/
-#      AZURE_OPENAI_DEPLOYMENT e.g. gpt-4o
-#
 # How authentication works
 # ========================
 # The AzureCLI@2 task logs in with the service connection before running the script.
@@ -26,6 +22,31 @@
 # The PR context (org, project, repo, PR ID, base branch) is read automatically
 # from the Azure Pipelines environment variables that the platform sets on PR builds.
 
+parameters:
+  - name: endpoint
+    displayName: 'Azure OpenAI endpoint URL (e.g. https://my-resource.openai.azure.com/)'
+    type: string
+
+  - name: deployment
+    displayName: 'Azure OpenAI deployment name (e.g. gpt-4o)'
+    type: string
+
+  - name: failOn
+    displayName: 'Fail build when any finding reaches this severity'
+    type: string
+    default: high
+    values:
+      - critical
+      - high
+      - medium
+      - low
+      - none
+
+  - name: verbose
+    displayName: 'Enable verbose logging (prints each agent tool call)'
+    type: boolean
+    default: false
+
 trigger: none   # Only run on PRs, not on direct pushes
 
 pr:
@@ -36,9 +57,15 @@ pr:
       - release/*
 
 pool:
-  vmImage: ubuntu-latest   # Or windows-latest — the tool is cross-platform
+  vmImage: ubuntu-latest   # Or windows-latest — see the commented step below
 
 steps:
+
+  # Full history is required so git diff can compare against the target branch.
+  # persistCredentials lets the AzureCLI@2 step fetch origin/<base-branch>.
+  - checkout: self
+    fetchDepth: 0
+    persistCredentials: true
 
   - task: UseDotNet@2
     displayName: Use .NET 9
@@ -58,6 +85,7 @@ steps:
     # To pin a specific published release for reproducibility, add:
     #   --version 1.3.2
 
+  # ── ubuntu-latest (bash) ────────────────────────────────────────────────────
   - task: AzureCLI@2
     displayName: Run AI Code Review
     inputs:
@@ -66,19 +94,44 @@ steps:
       scriptLocation: inlineScript
       addSpnToEnvironment: true   # exposes servicePrincipalId etc. if needed for debugging
       inlineScript: |
+        # Fetch the PR target branch so that origin/<base-branch> resolves for git diff.
+        # Azure Pipelines checks out a detached merge commit; the target branch ref is
+        # not fetched by default even with fetchDepth: 0.
+        TARGET="${SYSTEM_PULLREQUEST_TARGETBRANCH#refs/heads/}"
+        git fetch origin "${TARGET:-main}"
+
         ai-code-review \
-          --endpoint   "$(AZURE_OPENAI_ENDPOINT)" \
-          --deployment "$(AZURE_OPENAI_DEPLOYMENT)" \
+          --endpoint   "${{ parameters.endpoint }}" \
+          --deployment "${{ parameters.deployment }}" \
           --devops-comment \
-          --fail-on high
+          --fail-on    "${{ parameters.failOn }}"${{ if parameters.verbose }} \
+          --verbose${{ end }}
         # Remove --devops-comment to run in console-only mode (e.g. local dev)
-        # Remove --fail-on (or set to none) to make this step advisory-only
     env:
-      AZURE_OPENAI_ENDPOINT:    $(AZURE_OPENAI_ENDPOINT)
-      AZURE_OPENAI_DEPLOYMENT:  $(AZURE_OPENAI_DEPLOYMENT)
       # The following are set automatically by Azure Pipelines on PR builds:
       # SYSTEM_PULLREQUEST_TARGETBRANCH       → base branch (auto-detected)
       # SYSTEM_PULLREQUEST_PULLREQUESTID      → PR ID (auto-detected)
       # SYSTEM_TEAMPROJECT                    → project name (auto-detected)
       # SYSTEM_TEAMFOUNDATIONCOLLECTIONURI    → org URL (auto-detected)
       # BUILD_REPOSITORY_NAME                 → repo name (auto-detected)
+
+  # ── windows-latest (PowerShell) — swap pool vmImage and uncomment this ────
+  # - task: AzureCLI@2
+  #   displayName: Run AI Code Review
+  #   inputs:
+  #     azureSubscription: your-service-connection-name   # <-- update this
+  #     scriptType: ps
+  #     scriptLocation: inlineScript
+  #     addSpnToEnvironment: true
+  #     inlineScript: |
+  #       # Fetch the PR target branch so that origin/<base-branch> resolves for git diff.
+  #       $target = $env:SYSTEM_PULLREQUEST_TARGETBRANCH -replace '^refs/heads/', ''
+  #       if (-not $target) { $target = 'main' }
+  #       git fetch origin $target
+  #
+  #       ai-code-review `
+  #         --endpoint   "${{ parameters.endpoint }}" `
+  #         --deployment "${{ parameters.deployment }}" `
+  #         --devops-comment `
+  #         --fail-on    "${{ parameters.failOn }}"${{ if parameters.verbose }} `
+  #         --verbose${{ end }}
